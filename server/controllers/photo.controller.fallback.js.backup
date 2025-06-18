@@ -1,0 +1,150 @@
+/**
+ * Fallback Photo Controller for Linux-Optimized Photobooth
+ * Used when AWS S3 is not available
+ */
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+const smsService = require('../services/sms.service');
+
+// Base URL for accessing photos
+const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+
+// Directory for local captures
+const capturesDir = path.join(process.cwd(), 'public', 'captures');
+const backupDir = path.join(process.cwd(), 'backup_photos');
+
+// Ensure directories exist
+if (!fs.existsSync(capturesDir)) {
+  fs.mkdirSync(capturesDir, { recursive: true });
+}
+if (!fs.existsSync(backupDir)) {
+  fs.mkdirSync(backupDir, { recursive: true });
+}
+
+/**
+ * Upload a photo (local fallback when AWS is unavailable)
+ */
+exports.uploadPhoto = async (req, res) => {
+  try {
+    // Check if we have a file
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No photo provided'
+      });
+    }
+    
+    // Generate a unique filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const uniqueId = uuidv4();
+    const filename = `${timestamp}_${uniqueId}.jpg`;
+    
+    // Save to the public captures directory for web access
+    const publicPath = path.join(capturesDir, filename);
+    fs.writeFileSync(publicPath, req.file.buffer);
+    
+    // Also save to backup directory
+    const backupPath = path.join(backupDir, filename);
+    fs.writeFileSync(backupPath, req.file.buffer);
+    
+    // Generate URL for accessing the photo
+    const imageUrl = `${baseUrl}/captures/${filename}`;
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: 'Photo uploaded successfully (local storage)',
+      data: {
+        imageUrl,
+        filename,
+        awsStatus: 'unavailable'
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading photo (fallback):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error uploading photo',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Send a notification with the photo URL
+ */
+exports.sendNotification = async (req, res) => {
+  try {
+    const { recipient, imageUrl, type } = req.body;
+    
+    if (!recipient || !imageUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: recipient, imageUrl'
+      });
+    }
+    
+    // Currently only supporting SMS
+    if (type !== 'sms') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only SMS notifications are currently supported'
+      });
+    }
+    
+    // Format phone number if needed (remove any non-digits)
+    const phoneNumber = recipient.replace(/\D/g, '');
+    
+    // Send SMS
+    const result = await smsService.sendMessage(phoneNumber, imageUrl);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Notification sent successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error sending notification (fallback):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error sending notification',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Send SMS with photo URL (legacy endpoint)
+ */
+exports.sendSMS = async (req, res) => {
+  try {
+    const { phoneNumber, imageUrl } = req.body;
+    
+    if (!phoneNumber || !imageUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: phoneNumber, imageUrl'
+      });
+    }
+    
+    // Format phone number if needed (remove any non-digits)
+    const formattedNumber = phoneNumber.replace(/\D/g, '');
+    
+    // Send SMS
+    const result = await smsService.sendMessage(formattedNumber, imageUrl);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'SMS sent successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error sending SMS (fallback):', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error sending SMS',
+      error: error.message
+    });
+  }
+};

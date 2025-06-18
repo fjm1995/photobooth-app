@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Photobooth</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Prevent iOS from zooming on input focus -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <style>
+    /* Loading indicator for result screen */
+    .loading-indicator {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    
+    /* Improve the result screen */
+    #result-screen .result-image-container {
+      position: relative;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f8f9fa;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    #captured-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Welcome Screen -->
+    <div id="phone-screen" class="screen active">
+      <div class="logo-container">
+        <h1>Impact Photobooth</h1>
+      </div>
+      
+      <div class="phone-screen-content">
+        <div class="welcome-wrapper">
+          <div class="welcome-message">
+            <p>Take a photo and get a QR code to instantly access your picture.</p>
+            <p class="instruction-text"><i class="fas fa-qrcode"></i> After taking your photo, scan the QR code with your phone's camera to view and save your picture.</p>
+          </div>
+          
+          <button id="continue-btn" class="btn primary">
+            <i class="fas fa-camera"></i> Start Photo Session
+          </button>
+        </div>
+        
+        <div class="admin-corner">
+          <button id="admin-settings" class="icon-btn">
+            <i class="fas fa-cog"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Camera Preview Screen -->
+    <div id="camera-screen" class="screen">
+      <div class="preview-container">
+        <!-- Camera preview will be shown here -->
+        <img id="camera-preview-img" class="hidden" src="" alt="Camera preview">
+        <video id="camera-preview" autoplay playsinline></video>
+        
+        <!-- Countdown overlay -->
+        <div id="countdown" class="countdown hidden">10</div>
+        
+        <!-- Flash effect -->
+        <div id="flash" class="flash hidden"></div>
+      </div>
+      
+      <div class="camera-controls">
+        <button id="back-to-phone" class="btn secondary">
+          <i class="fas fa-arrow-left"></i> Back
+        </button>
+        
+        <div class="countdown-selector">
+          <div class="countdown-buttons">
+            <button class="countdown-btn" data-seconds="3">3s</button>
+            <button class="countdown-btn active" data-seconds="5">5s</button>
+            <button class="countdown-btn" data-seconds="10">10s</button>
+          </div>
+        </div>
+        
+        <button id="take-picture" class="btn primary">
+          <i class="fas fa-camera"></i> Take Picture
+        </button>
+        
+        <!-- Admin settings button in camera screen -->
+        <div class="admin-corner camera-controls-corner">
+          <button id="admin-settings-camera" class="icon-btn">
+            <i class="fas fa-cog"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Result Screen -->
+    <div id="result-screen" class="screen">
+      <div class="result-content">
+        <h2>Photo Captured!</h2>
+        
+        <div class="result-media-container">
+          <div class="result-image-container">
+            <img id="captured-image" src="" alt="Captured photo">
+          </div>
+          
+          <!-- QR Code Container -->
+          <div id="qr-code-container" class="qr-code-container">
+            <!-- QR code will be inserted here dynamically -->
+          </div>
+        </div>
+        
+        <div class="qr-instructions">
+          <i class="fas fa-mobile-alt"></i>
+          <p>Scan this QR code with your phone's camera to view and save your photo</p>
+        </div>
+        
+        <p id="status-message">Generating QR code...</p>
+        
+        <button id="start-over-btn" class="btn primary">
+          <i class="fas fa-camera"></i> Take Another Photo
+        </button>
+      </div>
+      
+      <!-- Admin settings button in result screen -->
+      <div class="admin-corner">
+        <button id="admin-settings-result" class="icon-btn">
+          <i class="fas fa-cog"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Admin Settings Modal -->
+  <div id="admin-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Application Settings</h2>
+        <button id="close-admin-x" class="close-modal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-grid">
+          <div class="setting-group">
+            <div class="setting-item">
+              <label for="image-quality">Image Quality:</label>
+              <select id="image-quality">
+                <option value="high">High</option>
+                <option value="medium" selected>Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            
+            <div class="setting-item">
+              <label for="flash-mode">Flash Mode:</label>
+              <select id="flash-mode">
+                <option value="auto" selected>Auto</option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+            
+            <div class="setting-item toggle-container">
+              <label for="auto-focus">Auto Focus:</label>
+              <label class="switch">
+                <input type="checkbox" id="auto-focus" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            
+            <div class="setting-item toggle-container">
+              <label for="mirror-preview">Mirror Preview:</label>
+              <label class="switch">
+                <input type="checkbox" id="mirror-preview">
+                <span class="slider round"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <div class="admin-actions">
+          <button id="restart-camera" class="btn secondary">
+            <i class="fas fa-sync-alt"></i> Restart Camera
+          </button>
+          <button id="reset-settings" class="btn secondary">
+            <i class="fas fa-undo"></i> Reset to Defaults
+          </button>
+          <button id="save-settings" class="btn primary">
+            <i class="fas fa-save"></i> Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- History Modal -->
+  <div id="history-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Photo History</h2>
+        <button id="close-history-x" class="close-modal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="photo-history" class="photo-grid">
+          <!-- Photos will be added here dynamically -->
+          <div class="empty-state">
+            <i class="fas fa-images"></i>
+            <p>No photos taken yet</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="close-history" class="btn primary">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Error Modal -->
+  <div id="error-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Error</h2>
+        <button id="close-error-x" class="close-modal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="error-message"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="close-error" class="btn primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
